@@ -95,12 +95,17 @@ server <- function(input,output) {
     subj = paste("https://aplonis.psyc.virginia.edu/decide/api/trials/?nocomment=True&no_page&subject=", input$subject, sep="")
     timerange = paste(strftime(startdate(), "%Y-%m-%dT%H:%M:%S%z"),strftime(stopdate(), "%Y-%m-%dT%H:%M:%S%z"), sep=',')
     query = paste(subj, paste('time__range', timerange, sep = "="), sep = "&")
+    #print(query)
     resp = GET(url = query)
     trials = jsonlite::fromJSON(url(query))
     trials = filter(trials,!is.na(trial))
     stimA = c()
     stimB = c()
     for (i in seq(1,length(trials$stimulus))) {
+      if (is.null(trials$stimulus[[i]])) {
+        stimA = c(stimA,NA)
+        stimB = c(stimB,NA)
+      }
       stimA = c(stimA,trials$stimulus[[i]][1])
       stimB = c(stimB,trials$stimulus[[i]][2])
     }
