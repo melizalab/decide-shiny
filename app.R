@@ -151,13 +151,16 @@ server <- function(input,output) {
   #Filter data for chosen experiment
   expdata = reactive({
     req(input$experiment)
-    filter(timedata(),experiment == input$experiment)
+    filtereddata = filter(timedata(),experiment == input$experiment)
+    if(dim(filtereddata)[1] == 0) {
+      return()
+    } else { filtereddata }
   })
   
   #Show number of records returned by API
   output$records = renderText({
     req(input$experiment)
-    if (dim(expdata())[1] > 0) {
+    if (!is.null(dim(expdata())[1]) && dim(expdata())[1] > 0) {
       paste("Returned",as.character(dim(expdata())[1]),"records:",sep=" ")
     } else {
       "Fetching records..."
@@ -166,8 +169,13 @@ server <- function(input,output) {
   
   #Plotting code
   output$cummulative = renderPlot({
+    if (is.null(expdata())) {
+      return()
+    }
     req(input$experiment)
-    if (dim(expdata())[1] == 0) {
+    if (is.null(dim(expdata())[1])) {
+      return()
+    } else if (dim(expdata())[1] == 0) {
       return()
     } else {
       ggplot(expdata(),aes(x=date,y=cumul)) +
@@ -195,6 +203,9 @@ server <- function(input,output) {
   })
   
   output$lor = renderPlot({
+    if (is.null(expdata())) {
+      return()
+    }
     data = filter(expdata(),response != "early")
     #data = mutate(data,peckposition = case_when(!is.na(position) ~ position, !is.na(peckposition) ~ peckposition),position=NULL)
     data = filter(data, is.na(peckposition) | peckposition != 1)
@@ -207,14 +218,17 @@ server <- function(input,output) {
       y = c(y,t)
     }
     y = y[!is.na(y)]
+    if (length(y) == 0){
+      return()
+    }
     oddsratio = as.data.frame(cbind(seq(1,length(y)),y))
     colnames(oddsratio) = c("x","y")
     oddsratio$y[which(oddsratio$y < 0)] = 0
     ggplot(oddsratio, aes(x=x, y=y)) + 
       geom_line(size=2) + 
-      geom_hline(yintercept = 0, color="red", size=1) + 
-      geom_hline(yintercept = 1, color="green",size=1) + 
-      geom_hline(yintercept = 0.65, color="green", linetype="dotted", size=1) + 
+      geom_hline(yintercept = 0, color="tomato", size=1) + 
+      geom_hline(yintercept = 1, color="seagreen1",size=1) + 
+      geom_hline(yintercept = 0.65, color="gold", linetype="dotted", size=1) + 
       scale_y_continuous(limits=c(0,max(y))) +
       xlab(paste("Running blocks of",as.character(runningavg()))) +
       ylab("Log Odds Ratio") +
@@ -224,6 +238,9 @@ server <- function(input,output) {
   bw = reactive({ 2 * IQR(expdata()$date) / length(expdata()$date)^(1/3) })
   
   output$outcome = renderPlot({
+    if (is.null(expdata())) {
+      return()
+    }
     ggplot(expdata(), aes(date,fill=outcome)) + 
       geom_histogram(binwidth = bw()) + 
       xlab("Days") + 
@@ -232,6 +249,9 @@ server <- function(input,output) {
   })
   
   output$rt = renderPlot({
+    if (is.null(expdata())) {
+      return()
+    }
     cortr = filter(expdata(), outcome=="peck_left.TRUE")
     ggplot(cortr, aes(x=ind,y=rtime)) + 
       geom_point() + 
@@ -242,6 +262,9 @@ server <- function(input,output) {
   })
   
   output$cumindex = renderPlot({
+    if (is.null(expdata())) {
+      return()
+    }
     ggplot(expdata(),aes(x=ind,y=cumul)) + 
       geom_line() + 
       geom_point() +
@@ -251,6 +274,9 @@ server <- function(input,output) {
   })
   
   output$mistake = renderPlot({
+    if (is.null(expdata())) {
+      return()
+    }
     early = filter(expdata(), outcome=="stimA.FALSE")
     ggplot(early, aes(x=ind,y=rtime)) + 
       geom_point() + 
