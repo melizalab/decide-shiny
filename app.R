@@ -6,6 +6,7 @@ library(anytime)
 library(httr)
 library(stringr)
 library(gtools)
+library(lubridate)
 
 ui <- fluidPage(
   titlePanel("Operant DataViz"),
@@ -28,6 +29,7 @@ ui <- fluidPage(
     mainPanel(
       tabsetPanel(type = "tabs",
                   tabPanel("Timeline", plotOutput("cummulative")),
+                  tabPanel("Odds Ratio", plotOutput("lor")),
                   tabPanel("Outcomes", plotOutput("outcome")),
                   tabPanel("Cummulative", plotOutput("cumindex")),
                   tabPanel("Response time", plotOutput("rt")),
@@ -120,12 +122,30 @@ server <- function(input,output) {
     trials$ind = seq(1,dim(trials)[1])
     trials$response = as.factor(trials$response)
     trials$outcome = with(trials, interaction(response,correct))
+    trials$H = NA
+    trials$M = NA
+    trials$CR = NA
+    trials$FA = NA
+    for (i in seq(1,dim(trials)[1])) {
+      trials$H[i] = ifelse(trials$response[i] == "peck_left", 1, 0)
+      trials$FA[i] = ifelse(trials$response[i] == "stimA", 1, 0)
+      trials$M[i] = ifelse(trials$response[i] == "stimA" && trials$oddball[i] == TRUE, 1, 0)
+      if (!is.na(trials$peckposition[i]) && trials$peckposition[i] > 0) {
+        trials$CR[i] = ifelse(trials$peckposition[i] >= trials$bposition[i], (trials$bposition[i]-2), (trials$peckposition[i]-2))
+        trials$CR[i] = ifelse(trials$peckposition[i] > (trials$bposition[i]+1), (trials$CR[i] + ((trials$peckposition[i]-1) - (trials$bposition[i]+1))), trials$CR[i])
+      } else {
+        trials$CR[i] = ifelse(trials$correct[i] == TRUE, (trials$block[i]-1), ifelse(trials$bposition[i] == trials$block[i], (trials$block[i]-2), (trials$block[i]-3)))
+        trials$M[i] = ifelse(trials$correct[i] == TRUE, 0, 1)
+      }
+    }
     trials
   })
   
   #Get list of experiments within time range
   output$exp = renderUI({
-    selectInput('experiment','Experiment:',unique(timedata()$experiment[!is.na(timedata()$experiment)]))
+    explist = unique(timedata()$experiment[!is.na(timedata()$experiment)])
+    explist = sort(explist,decreasing=TRUE)
+    selectInput('experiment','Experiment:',explist)
   })
   
   #Filter data for chosen experiment
@@ -158,6 +178,47 @@ server <- function(input,output) {
         ylab("Cumulative correct trials") + 
         ggtitle("Correct trials over time")
     }
+  })
+  
+  lorf = function(H,M,CR,FA) {
+    hm = (H/M)
+    crfa = (CR/FA)
+    return (log((hm*crfa)^0.5))
+  }
+  
+  runningavg = reactive({
+    if (input$time == 1 | input$time == 2) {
+      20
+    } else {
+      50
+    }
+  })
+  
+  output$lor = renderPlot({
+    data = filter(expdata(),response != "early")
+    #data = mutate(data,peckposition = case_when(!is.na(position) ~ position, !is.na(peckposition) ~ peckposition),position=NULL)
+    data = filter(data, is.na(peckposition) | peckposition != 1)
+    data = filter(data,as.integer(format(anytime(date),"%H")) >= 10, as.integer(format(anytime(date),"%H")) <= 17)
+    data = filter(data,wday(anytime(date)) > 1, wday(anytime(date)) < 7)
+    y = c()
+    addon = ifelse(runningavg() < 50, 5, 10)
+    for (i in seq(1,as.integer(dim(data)[1]),addon)) {
+      t = lorf(sum(data$H[i:(i+runningavg())]),sum(data$M[i:(i+runningavg())]),sum(data$CR[i:(i+runningavg())]),sum(data$FA[i:(i+runningavg())]))
+      y = c(y,t)
+    }
+    y = y[!is.na(y)]
+    oddsratio = as.data.frame(cbind(seq(1,length(y)),y))
+    colnames(oddsratio) = c("x","y")
+    oddsratio$y[which(oddsratio$y < 0)] = 0
+    ggplot(oddsratio, aes(x=x, y=y)) + 
+      geom_line(size=2) + 
+      geom_hline(yintercept = 0, color="red", size=1) + 
+      geom_hline(yintercept = 1, color="green",size=1) + 
+      geom_hline(yintercept = 0.65, color="green", linetype="dotted", size=1) + 
+      scale_y_continuous(limits=c(0,max(y))) +
+      xlab(paste("Running blocks of",as.character(runningavg()))) +
+      ylab("Log Odds Ratio") +
+      ggtitle("Running average of odds ratio performance")
   })
   
   bw = reactive({ 2 * IQR(expdata()$date) / length(expdata()$date)^(1/3) })
