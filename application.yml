@@ -1,0 +1,20 @@
+proxy:
+  title: Meliza Lab Operant DataViz
+  hide-navbar: false
+  landing-page: /
+  heartbeat-rate: 10000
+  heartbeat-timeout: 600000
+  port: 8080
+  docker:
+    internal-networking: true
+  specs:
+  - id: shiny_app
+    display-name: operant dataviz
+    description: Visualize operant performance
+    container-cmd: ["/usr/bin/shiny-server.sh"]
+    container-image: dmeliza/decide-shiny
+    container-network: decide-net
+    container-env:
+      user: "shiny"
+      environment:
+        - APPLICATION_LOGS_TO_STDOUT=false
