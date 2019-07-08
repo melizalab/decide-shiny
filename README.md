@@ -20,7 +20,7 @@ library(shiny)
 runApp("appdir/track_oddball")
 ```
 
-This should open up a browser tab pointing to the server.
+This should open up a browser tab pointing to the application.
 
 ## Deploying as a Docker container
 
@@ -37,7 +37,15 @@ docker run --name=shiny_app --rm -p 3838:3838 --user shiny -v `pwd`:/srv/shiny-s
 Navigate to http://localhost:3838/appdir/track_oddball/
 
 #### Production
+
+To deploy the application, we'll use [shiny server](https://shiny.rstudio.com/articles/shiny-server.html) in a Docker container. Using Docker allows us to package all the required dependencies and isolate the server from the host system. Shiny Server should spawn processes as needed, but it's not expected that there will be a heavy load. The server should be hosted behind an nginx server, which provides encryption and authentication for connections.
+
+There should be an image on the Docker hub that you can use by simply running:
+
 ``` shell
-docker run --name=shiny_app --rm -p 3838:3838 --user shiny melizalab/decide-shiny
+docker run --name=shiny_app -p 3838:3838 --user shiny -d --restart unless-stopped dmeliza/decide-shiny
 ```
+
 Navigate to http://localhost:3838/track_oddball/
+
+You can run this container as an nginx reverseproxy.
