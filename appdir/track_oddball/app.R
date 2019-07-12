@@ -189,6 +189,12 @@ server <- function(input,output) {
   })
 
   lorf = function(H,M,CR,FA) {
+    if (!is.na(M) && M == 0) {
+      M = 0.5
+    }
+    if (!is.na(FA) && FA == 0) {
+      FA = 0.5
+    }
     hm = (H/M)
     crfa = (CR/FA)
     return (log((hm*crfa)^0.5))
