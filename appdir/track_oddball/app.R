@@ -97,7 +97,7 @@ server <- function(input,output) {
     subj = paste("https://aplonis.psyc.virginia.edu/decide/api/trials/?nocomment=True&no_page&subject=", input$subject, sep="")
     timerange = paste(strftime(startdate(), "%Y-%m-%dT%H:%M:%S"),strftime(stopdate(), "%Y-%m-%dT%H:%M:%S"), sep=',')
     query = paste(subj, paste('time__range', timerange, sep = "="), sep = "&")
-    print(query)
+    #print(query)
     resp = GET(url = query)
     trials = jsonlite::fromJSON(url(query))
     trials = filter(trials,!is.na(trial))
@@ -128,7 +128,6 @@ server <- function(input,output) {
       trials$rtime = NA
     }
     trials$cumul = as.numeric(trials$correct)
-    trials$cumul = 1
     trials$cumul = cumsum(trials$cumul)
     trials$ind = seq(1,dim(trials)[1])
     trials$response = as.factor(trials$response)
