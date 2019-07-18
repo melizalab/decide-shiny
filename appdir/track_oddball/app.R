@@ -10,7 +10,7 @@ library(lubridate)
 
 ui <- fluidPage(
   titlePanel("Operant DataViz"),
-
+  
   sidebarLayout(
     sidebarPanel(
       uiOutput('subj'),
@@ -40,14 +40,14 @@ ui <- fluidPage(
 )
 
 server <- function(input,output) {
-
+  
   #Get list of subjects from API
   output$subj = renderUI({
     s = fromJSON(url("https://aplonis.psyc.virginia.edu/decide/api/subjects/"))
     subjlist = s$name[s$name!="dummy"]
     selectInput('subject','Subject:',subjlist)
   })
-
+  
   #Set start date of data request
   startdate = reactive({
     if (input$time == 1) {
@@ -64,7 +64,7 @@ server <- function(input,output) {
       as.POSIXct(t1)
     }
   })
-
+  
   #Set end date of data request
   stopdate = reactive({
     if (input$time == 2) {
@@ -77,7 +77,7 @@ server <- function(input,output) {
       as.POSIXct(t2)
     }
   })
-
+  
   #Set plot label based on time selection
   labeltype = reactive({
     if (input$time == 1 | input$time == 2) {
@@ -86,7 +86,7 @@ server <- function(input,output) {
       "%D"
     }
   })
-
+  
   #Enable data update with button press
   update = eventReactive(input$update, {}, ignoreNULL = FALSE)
 
@@ -95,7 +95,7 @@ server <- function(input,output) {
     req(input$subject)
     u = update()
     subj = paste("https://aplonis.psyc.virginia.edu/decide/api/trials/?nocomment=True&no_page&subject=", input$subject, sep="")
-    timerange = paste(strftime(startdate(), "%Y-%m-%dT%H:%M:%S"),strftime(stopdate(), "%Y-%m-%dT%H:%M:%S"), sep=',')
+    timerange = paste(strftime(startdate(), "%Y-%m-%dT%H:%M:%S%z"),strftime(stopdate(), "%Y-%m-%dT%H:%M:%S%z"), sep=',')
     query = paste(subj, paste('time__range', timerange, sep = "="), sep = "&")
     #print(query)
     resp = GET(url = query)
@@ -103,22 +103,33 @@ server <- function(input,output) {
     trials = filter(trials,!is.na(trial))
     stimA = c()
     stimB = c()
-    for (i in seq(1,length(trials$stimulus))) {
-      if (is.null(trials$stimulus[[i]])) {
-        stimA = c(stimA,NA)
-        stimB = c(stimB,NA)
+    if (!is.null(trials$stimulus)) {
+      for (i in seq(1,length(trials$stimulus))) {
+        if (is.null(trials$stimulus[[i]])) {
+          stimA = c(stimA,NA)
+          stimB = c(stimB,NA)
+        }
+        stimA = c(stimA,trials$stimulus[[i]][1])
+        stimB = c(stimB,trials$stimulus[[i]][2])
       }
-      stimA = c(stimA,trials$stimulus[[i]][1])
-      stimB = c(stimB,trials$stimulus[[i]][2])
+      trials = subset(trials, select=-c(stimulus))
+      trials$stimA = stimA
+      trials$stimB = stimB
+    } else {
+      trials$stimA = NA
+      trials$stimB = NA
     }
-    trials = subset(trials, select=-c(stimulus))
-    trials$stimA = stimA
-    trials$stimB = stimB
     trials$date = anytime(trials$time)
     trials = arrange(trials, date)
+    if (!is.null(trials$correct)) {
+      trials$rtime = trials$rtime/1e6
+    } else {
+      trials$correct = TRUE
+      trials$rtime = NA
+    }
     trials$cumul = as.numeric(trials$correct)
+    trials$cumul = 1
     trials$cumul = cumsum(trials$cumul)
-    trials$rtime = trials$rtime/1e6
     trials$ind = seq(1,dim(trials)[1])
     trials$response = as.factor(trials$response)
     trials$outcome = with(trials, interaction(response,correct))
@@ -130,7 +141,7 @@ server <- function(input,output) {
       trials$H[i] = ifelse(trials$response[i] == "peck_left", 1, 0)
       trials$FA[i] = ifelse(trials$response[i] == "stimA", 1, 0)
       trials$M[i] = ifelse(trials$response[i] == "stimA" && trials$oddball[i] == TRUE, 1, 0)
-      if (!is.na(trials$peckposition[i]) && trials$peckposition[i] > 0) {
+      if (!is.null(trials$peckposition) && !is.na(trials$peckposition[i]) && trials$peckposition[i] > 0) {
         trials$CR[i] = ifelse(trials$peckposition[i] >= trials$bposition[i], (trials$bposition[i]-2), (trials$peckposition[i]-2))
         trials$CR[i] = ifelse(trials$peckposition[i] > (trials$bposition[i]+1), (trials$CR[i] + ((trials$peckposition[i]-1) - (trials$bposition[i]+1))), trials$CR[i])
       } else {
@@ -140,23 +151,29 @@ server <- function(input,output) {
     }
     trials
   })
-
+  
   #Get list of experiments within time range
   output$exp = renderUI({
     explist = unique(timedata()$experiment[!is.na(timedata()$experiment)])
+    shapelist = unique(timedata()$program[!is.na(timedata()$program)])
+    explist = rbind(explist,shapelist)
     explist = sort(explist,decreasing=TRUE)
     selectInput('experiment','Experiment:',explist)
   })
-
+  
   #Filter data for chosen experiment
   expdata = reactive({
     req(input$experiment)
-    filtereddata = filter(timedata(),experiment == input$experiment)
+    if (!is.null(timedata()$experiment)) {
+      filtereddata = filter(timedata(),experiment == input$experiment)
+    } else {
+      filtereddata = filter(timedata(),program == input$experiment)
+    }
     if(dim(filtereddata)[1] == 0) {
       return()
     } else { filtereddata }
   })
-
+  
   #Show number of records returned by API
   output$records = renderText({
     req(input$experiment)
@@ -166,7 +183,7 @@ server <- function(input,output) {
       "Fetching records..."
     }
   })
-
+  
   #Plotting code
   output$cummulative = renderPlot({
     if (is.null(expdata())) {
@@ -179,15 +196,15 @@ server <- function(input,output) {
       return()
     } else {
       ggplot(expdata(),aes(x=date,y=cumul)) +
-        geom_line() +
-        geom_point() +
-        scale_x_datetime(date_labels=labeltype(),limits=c(min(expdata()$date),max(expdata()$date))) +
-        xlab("Time of trials") +
-        ylab("Cumulative correct trials") +
+        geom_line() + 
+        geom_point() + 
+        scale_x_datetime(date_labels=labeltype(),limits=c(min(expdata()$date),max(expdata()$date))) + 
+        xlab("Time of trials") + 
+        ylab("Cumulative correct trials") + 
         ggtitle("Correct trials over time")
     }
   })
-
+  
   lorf = function(H,M,CR,FA) {
     if (!is.na(M) && M == 0) {
       M = 0.5
@@ -199,7 +216,7 @@ server <- function(input,output) {
     crfa = (CR/FA)
     return (log((hm*crfa)^0.5))
   }
-
+  
   runningavg = reactive({
     if (input$time == 1 | input$time == 2) {
       20
@@ -207,16 +224,18 @@ server <- function(input,output) {
       50
     }
   })
-
+  
   output$lor = renderPlot({
     if (is.null(expdata())) {
+      return()
+    } else if (!is.null(expdata()$program)) {
       return()
     }
     data = filter(expdata(),response != "early")
     #data = mutate(data,peckposition = case_when(!is.na(position) ~ position, !is.na(peckposition) ~ peckposition),position=NULL)
     data = filter(data, is.na(peckposition) | peckposition != 1)
     data = filter(data,as.integer(format(anytime(date),"%H")) >= 10, as.integer(format(anytime(date),"%H")) <= 17)
-    data = filter(data,wday(anytime(date)) > 1, wday(anytime(date)) < 7)
+    #data = filter(data,wday(anytime(date)) > 1, wday(anytime(date)) < 7)
     y = c()
     addon = ifelse(runningavg() < 50, 5, 10)
     for (i in seq(1,as.integer(dim(data)[1]),addon)) {
@@ -230,68 +249,68 @@ server <- function(input,output) {
     oddsratio = as.data.frame(cbind(seq(1,length(y)),y))
     colnames(oddsratio) = c("x","y")
     oddsratio$y[which(oddsratio$y < 0)] = 0
-    ggplot(oddsratio, aes(x=x, y=y)) +
-      geom_line(size=2) +
-      geom_hline(yintercept = 0, color="tomato", size=1) +
-      geom_hline(yintercept = 1, color="seagreen1",size=1) +
-      geom_hline(yintercept = 0.65, color="gold", linetype="dotted", size=1) +
+    ggplot(oddsratio, aes(x=x, y=y)) + 
+      geom_line(size=2) + 
+      geom_hline(yintercept = 0, color="tomato", size=1) + 
+      geom_hline(yintercept = 1, color="seagreen1",size=1) + 
+      geom_hline(yintercept = 0.65, color="gold", linetype="dotted", size=1) + 
       scale_y_continuous(limits=c(0,max(y))) +
       xlab(paste("Running blocks of",as.character(runningavg()))) +
       ylab("Log Odds Ratio") +
       ggtitle("Running average of odds ratio performance")
   })
-
+  
   bw = reactive({ 2 * IQR(expdata()$date) / length(expdata()$date)^(1/3) })
-
+  
   output$outcome = renderPlot({
     if (is.null(expdata())) {
       return()
     }
-    ggplot(expdata(), aes(date,fill=outcome)) +
-      geom_histogram(binwidth = bw()) +
-      xlab("Days") +
-      ylab("Number of trials") +
+    ggplot(expdata(), aes(date,fill=outcome)) + 
+      geom_histogram(binwidth = bw()) + 
+      xlab("Days") + 
+      ylab("Number of trials") + 
       ggtitle("Summary of performance over time")
   })
-
+  
   output$rt = renderPlot({
     if (is.null(expdata())) {
       return()
     }
     cortr = filter(expdata(), outcome=="peck_left.TRUE")
-    ggplot(cortr, aes(x=ind,y=rtime)) +
-      geom_point() +
-      geom_smooth(method='lm', se = TRUE) +
-      xlab("Trials") +
-      ylab("Response time") +
+    ggplot(cortr, aes(x=ind,y=rtime)) + 
+      geom_point() + 
+      geom_smooth(method='lm', se = TRUE) + 
+      xlab("Trials") + 
+      ylab("Response time") + 
       ggtitle("Response time of pecks after target stimulus")
   })
-
+  
   output$cumindex = renderPlot({
     if (is.null(expdata())) {
       return()
     }
-    ggplot(expdata(),aes(x=ind,y=cumul)) +
-      geom_line() +
+    ggplot(expdata(),aes(x=ind,y=cumul)) + 
+      geom_line() + 
       geom_point() +
-      xlab("Trials") +
+      xlab("Trials") + 
       ylab("Correct responses") +
       ggtitle("Cummulative correct responses across trials")
   })
-
+  
   output$mistake = renderPlot({
     if (is.null(expdata())) {
       return()
     }
     early = filter(expdata(), outcome=="stimA.FALSE")
-    ggplot(early, aes(x=ind,y=rtime)) +
-      geom_point() +
+    ggplot(early, aes(x=ind,y=rtime)) + 
+      geom_point() + 
       geom_smooth(method='lm', se = TRUE) +
       xlab("Trials") +
       ylab("Response time") +
       ggtitle("Response time for incorrect pecks")
   })
-
+  
   #Enable download of plotting data
   output$downloadData <- downloadHandler(
     filename = function() {
