@@ -100,7 +100,9 @@ server <- function(input,output) {
     #print(query)
     resp = GET(url = query)
     trials = jsonlite::fromJSON(url(query))
-    trials = filter(trials,!is.na(trial))
+    if (length(!is.na(trials$trial)) > 0) {
+      trials = filter(trials,!is.na(trial))
+    } else { return () }
     stimA = c()
     stimB = c()
     if (!is.null(trials$stimulus)) {
