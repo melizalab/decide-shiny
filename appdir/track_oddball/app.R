@@ -130,6 +130,7 @@ server <- function(input,output) {
       trials$rtime = NA
     }
     trials$cumul = as.numeric(trials$correct)
+    trials$cumul[is.na(trials$cumul)] = 0
     trials$cumul = cumsum(trials$cumul)
     trials$ind = seq(1,dim(trials)[1])
     trials$response = as.factor(trials$response)
