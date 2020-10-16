@@ -236,7 +236,7 @@ server <- function(input,output) {
     data = filter(expdata(),response != "early")
     #data = mutate(data,peckposition = case_when(!is.na(position) ~ position, !is.na(peckposition) ~ peckposition),position=NULL)
     data = filter(data, is.na(peckposition) | peckposition != 1)
-    data = filter(data,as.integer(format(anytime(date),"%H")) >= 10, as.integer(format(anytime(date),"%H")) <= 17)
+    #data = filter(data,as.integer(format(anytime(date),"%H")) >= 10, as.integer(format(anytime(date),"%H")) <= 17)
     #data = filter(data,wday(anytime(date)) > 1, wday(anytime(date)) < 7)
     y = c()
     addon = ifelse(runningavg() < 50, 5, 10)
