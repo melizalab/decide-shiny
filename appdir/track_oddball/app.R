@@ -43,7 +43,7 @@ server <- function(input,output) {
   
   #Get list of subjects from API
   output$subj = renderUI({
-    s = fromJSON(url("https://aplonis.psyc.virginia.edu/decide/api/subjects/"))
+    s = fromJSON(url("http://aplonis.lab/decide/api/subjects/"))
     subjlist = s$name[s$name!="dummy"]
     selectInput('subject','Subject:',subjlist)
   })
@@ -94,7 +94,7 @@ server <- function(input,output) {
   timedata = reactive({
     req(input$subject)
     u = update()
-    subj = paste("https://aplonis.psyc.virginia.edu/decide/api/trials/?nocomment=True&no_page&subject=", input$subject, sep="")
+    subj = paste("http://aplonis.lab/decide/api/trials/?nocomment=True&no_page&subject=", input$subject, sep="")
     timerange = paste(strftime(startdate(), "%Y-%m-%dT%H:%M:%S"),strftime(stopdate(), "%Y-%m-%dT%H:%M:%S"), sep=',')
     query = paste(subj, paste('time__range', timerange, sep = "="), sep = "&")
     #print(query)
