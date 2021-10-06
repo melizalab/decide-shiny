@@ -24,8 +24,20 @@ This should open up a browser tab pointing to the server.
 
 ## Deploying as a Docker container
 
+Create image:
 ``` shell
-docker run --name=shiny_app --rm -p 3838:3838 --user shiny -v `pwd`:/srv/shiny-server/ dmeliza/decide-shiny
+docker build -t melizalab/decide-shiny .
 ```
 
+#### Development
+(updates automatically based on changes to local repo)
+``` shell
+docker run --name=shiny_app --rm -p 3838:3838 --user shiny -v `pwd`:/srv/shiny-server/ melizalab/decide-shiny
+```
 Navigate to http://localhost:3838/appdir/track_oddball/
+
+#### Production
+``` shell
+docker run --name=shiny_app --rm -p 3838:3838 --user shiny melizalab/decide-shiny
+```
+Navigate to http://localhost:3838/track_oddball/
