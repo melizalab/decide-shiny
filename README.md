@@ -43,9 +43,11 @@ To deploy the application, we'll use [shiny server](https://shiny.rstudio.com/ar
 There should be an image on the Docker hub that you can use by simply running:
 
 ``` shell
-docker run --name=shiny_app -p 3838:3838 --user shiny -d --restart unless-stopped dmeliza/decide-shiny
+docker run --name=shiny_app -p 3838:3838 --user shiny -d --restart unless-stopped melizalab/decide-shiny
 ```
 
 Navigate to http://localhost:3838/track_oddball/
 
 You can run this container as an nginx reverseproxy.
+
+To rebuild the docker container (e.g. with a new version of the code), you need to run `docker build -t melizalab/decide-shiny .` and then `docker push melizalab/decide-shiny`
